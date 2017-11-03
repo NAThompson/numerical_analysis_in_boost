@@ -42,7 +42,7 @@ The features I added would have been stillborn without John's help.
 
 ---
 
-> It’s always been “We can’t do it that way. It would be too slow.”
+> It’s always been 'We can’t do it that way. It would be too slow.'
 You know what’s slow? Spending all day trying to figure out why it doesn’t work. That’s slow. That’s the slowest thing I know.
 
 -- [Paul Phillips](https://www.youtube.com/watch?v=TS1lpKBMkgg)
@@ -198,6 +198,7 @@ Satisfying the interpolation condition $$s(x_j) = y_j$$ requires solving a tridi
 ## Equispaced interpolation via [cubic\_b\_spline](http://www.boost.org/doc/libs/1_65_1/libs/math/doc/html/math_toolkit/interpolate/cubic_b.html)
 
 ```cpp
+#include <boost/math/interpolators/cubic_b_spline.hpp>
 std::vector<double> v(n);
 // initialize v ...
 double t0 = 0; // initial time
@@ -227,11 +228,66 @@ $$
 
 ## Irregular interpolation via [barycentric\_rational](http://www.boost.org/doc/libs/1_65_1/libs/math/doc/html/math_toolkit/interpolate/barycentric.html)
 
+Given a list of unequally spaced points $$x_0 < x_1 < \cdots < x_{n-1}$$ and a list of values $$f(x_0), f(x_1), \ldots, f(x_{n-1})$$
+we wish to construct a rational function $$r$$ such that $$r(x_{j}) = f(x_{j})$$
+
+
+---
+
+## Rational functions
+
+can be written as
+
+$$
+r(x) = \frac{\sum_{j=0}^{n} a_{j}x^{j}}{ \sum_{k=0}^{m} b_{k}x^{k}}
+$$
+
+Interpolating with generic rational functions is unwise, as the denominator can be zero, leading to poles in the interpolation domain.
+
+---
+
+## Rational interpolants
+
+with $$n = m$$ can always be written in the *barycentric form*
+
+$$
+r(x) = \frac{\sum_{k=0}^{n} \frac{ w_{k} }{x-x_k} f(x_{k})}{\sum_{k=0}^{n} \frac{w_{k}}{x-x_k}}
+$$
+
+
+---
+
+## Barycentric weights
+
+Different weights can be chosen to produce interpolants of varying character. For Boost's barycentric_rational, we have
+
+$$
+w_{k} := (-1)^{k-d}\sum_{i \in J_{k}}\prod_{j=i, j\ne k}^{i+d} \frac{1}{|x_k - x_j|}
+$$
+
+where
+
+$$
+J_{k} := \{i \colon k -d \le i \le k \land 0\le i \le n-d\}
+$$
+
+
+
+
+---
+
+## Using barycentric_rational
+
+
+
 ```cpp
+#include <boost/math/interpolators/barycentric_rational.hpp>
+
 std::vector<double> x(n);
 std::vector<double> y(n);
 // initialize x, y . . .
-boost::math::barycentric_rational<double> b(x.begin(), x.end(), y.begin());
+int approximation_order = 3;
+boost::math::barycentric_rational<double> b(x.begin(), x.end(), y.begin(), approximation_order);
 // Interpolate:
 double y = b(12.7);
 ```
@@ -246,8 +302,10 @@ $$\mathcal{O}(n)$$ constructor and $$\mathcal{O}(n)$$ evaluation.
 
 ## [barycentric\_rational](http://www.boost.org/doc/libs/1_65_1/libs/math/doc/html/math_toolkit/interpolate/barycentric.html) accuracy and stability
 
-$$f \in C^{5}[a, b] \implies
-\left\| f - r \right\| \le h^{4}(b-a)\frac{ \left\|f^{(5)} \right\|}{5}
+If $$h := \max_{i} (x_{i+1} - x_{i})$$ then
+
+$$f \in C^{d+2}[a, b] \implies
+\left\| f - r \right\| \le h^{d+1}(b-a)\frac{ \left\|f^{(d+2)} \right\|}{d+2}
 $$
 
 Special cases have been proven forward stable, but no general proof is known
@@ -340,7 +398,9 @@ This is a DCT-II for $$x_{k} = f(\cos((k+1/2)\pi/n))$$, and hence all coefficien
 #include <boost/math/special_functions/chebyshev_transform.hpp>
 
 auto f = [](double x) { return sin(x);};
-boost::math::cheyshev_transform cheb(f, 0.0, M_PI);
+
+chebyshev_transform<double> cheb(f, 0.0, M_PI);
+
 // Interpolate:
 double x = cheb(0.3);
 // Integrate over [0, M_PI]
@@ -358,5 +418,27 @@ Since we require a DCT-II, we have a dependency on FFTW.
 Pull requests to eliminate this dependency are welcome!
 
 (This shouldn't be too bad: We only require a power of two DCT-II)
+
+---
+
+## Quadrature
+
+is the numerical art of evaluating integrals
+
+$$
+I_{a}^{b}[f] := \int_{a}^{b} f(x) \, \mathrm{d}x \in \mathbb{R}
+$$
+
+---
+
+## Quadrature
+
+Most integrals do not have "analytic representations", such as
+
+$$
+\int_{-\infty}^{\infty} e^{-x^2} \, \mathrm{d}x = \sqrt{\pi}
+$$
+
+so numerical quadrature much be used.
 
 ---
