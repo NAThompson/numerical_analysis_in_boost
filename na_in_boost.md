@@ -199,11 +199,12 @@ Satisfying the interpolation condition $$s(x_j) = y_j$$ requires solving a tridi
 
 ```cpp
 #include <boost/math/interpolators/cubic_b_spline.hpp>
+using boost::math::cubic_b_spline;
 std::vector<double> v(n);
 // initialize v ...
 double t0 = 0; // initial time
 double h = 0.01; // spacing between points
-boost::math::cubic_b_spline<double> spline(f.begin(), f.end(), t0, h);
+cubic_b_spline<double> spline(f.begin(), f.end(), t0, h);
 // Interpolate:
 double y = spline(0.3);
 // Interpolate derivative:
@@ -440,5 +441,118 @@ $$
 $$
 
 so numerical quadrature much be used.
+
+---
+
+## Trapezoidal Rule
+
+![inline](figures/trapezoidal.png)
+
+(Image courtesy of [Jeremy Kun](https://jeremykun.com))
+
+---
+
+## Trapezoidal Rule
+
+Let $$x_{k} := a + kh$$ for $$k \in \{0, \ldots n\}$$. Then the trapezoidal rule is given by
+
+$$
+\int_{a}^{b} f(x) \, \mathrm{d}x \approx h\left[ \frac{f(x_0)+ f(x_n)}{2} + \sum_{k=1}^{n-1} f(x_{k})  \right] =: T_{h}[f]
+$$
+
+---
+
+## Trapezoidal Rule
+
+If $$f \in C^{2}[a, b]$$ then the error of the trapezoidal rule is
+
+$$
+\left| I_{a}^{b}[f] - T_{h}[f] \right| \le \frac{b-a}{2}h^2\left\|f''\right\|_{\infty}
+$$
+
+The $$\mathcal{O}(h^2)$$ error implies that this method is *too slow*.
+
+
+---
+
+## Euler-Maclaurin Expansion
+
+
+Let $$f \in C^{m}[a,b]$$. Then
+
+$$
+\int_{a}^{a+T} f(x) \, \mathrm{d}x = T_{h}[f] - \sum_{j=1}^{\lceil m/2 \rceil } \frac{b_{2j} h^{2j}}{(2j)!} (f^{(2j-1)}(a+T) - f^{(2j-1)}(a))
++ (-1)^{m}h^{m}\int_{a}^{a+T} B_{m}\left(\frac{x-a}{h} \right)f^{(m)}(x) \, \mathrm{d}x
+$$
+
+where $$b_{2j}$$ are the *Bernoulli numbers* and $$B_{m}$$ are the Bernoulli polynomials.
+
+---
+
+## Euler-Maclaurin expansion
+
+If $$f \in C^{m}[a,a+T]$$ is periodic, then
+
+$$
+\int_{a}^{a+T} f(x) \, \mathrm{d}x = T_{h}[f]
++ (-1)^{m}h^{m}\int_{a}^{a+T} B_{m}\left(\frac{x-a}{h} \right)f^{(m)}(x) \, \mathrm{d}x
+$$
+
+If $$f$$ is smooth and periodic, then *the trapezoidal rule converges faster than any power of $$h$$*.
+
+---
+
+## Trapezoidal quadrature in [Boost.Math](http://www.boost.org/doc/libs/1_65_1/libs/math/doc/html/math_toolkit/quadrature/trapezoidal.html)
+
+```cpp
+#include <boost/math/quadrature/trapezoidal.hpp>
+using boost::math::quadrature::trapezoidal;
+auto f = [](double x) { return 1/(5 - 4*cos(x)); };
+double I = trapezoidal(f, 0.0, 2*M_PI);
+```
+
+---
+
+## Periodic integrands
+
+are a pretty big restriction for exponential convergence.
+
+Could we make a variable transformation that allows exponential convergence for any $$C^{\infty}$$ integrand?
+
+---
+
+## Variable transformations
+
+Let $$x = g(t)$$. Then
+
+$$
+\int_{a}^{b} f(x) \, \mathrm{d}x = \int_{g^{-1}(a)}^{g^{-1}(b)} f(g(t)) g'(t) \, \mathrm{d}t
+$$
+
+No one has developed a transform such that $$f\circ g \cdot g'$$ is periodic on the interval $$(g^{-1}(a), g^{-1}(b))$$, but it's easy enough the ensure that $$(g^{-1}(a), g^{-1}(b)) = (-\infty, \infty)$$ . . .
+
+---
+
+### $$g(t) := \tanh\left(\frac{\pi}{2} \sinh(t) \right)$$
+
+![inline](figures/tanh_sinh.png)
+
+---
+
+## Tanh-sinh quadrature
+
+Applying the trapezoidal rule to $$f\circ g\cdot g'$$ with transform $$g(t) := \tanh\left(\frac{\pi}{2} \sinh(t) \right)$$ gives us *tanh-sinh* quadrature.
+
+For analytic $$f$$, this scheme is *exponentially convergent*.
+
+---
+
+## Send us pull requests! We need
+
+- Wavelet transforms
+- RiskShrink denoising
+- Sparse grid quadrature
+- Monte Carlo integration (Frank-Wolfe bayesian quadrature)
+- Multivariate interpolation
 
 ---

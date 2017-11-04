@@ -1,12 +1,15 @@
 #include <iostream>
 #include <vector>
+#include <boost/math/constants/constants.hpp>
 #include <boost/math/interpolators/cubic_b_spline.hpp>
 #include <boost/math/interpolators/barycentric_rational.hpp>
 #include <boost/math/special_functions/chebyshev_transform.hpp>
+#include <boost/math/quadrature/trapezoidal.hpp>
 
 using boost::math::cubic_b_spline;
 using boost::math::barycentric_rational;
 using boost::math::chebyshev_transform;
+using boost::math::quadrature::trapezoidal;
 
 int main()
 {
@@ -40,5 +43,9 @@ int main()
     std::cout << "cheb'(" << 0.7 << ") = " << cheb.prime(0.7) << std::endl;
     std::cout << "I[cheb] = " << cheb.integrate() << std::endl;
 
+
+    auto g = [](double x) { return 1/(5 - 4*cos(x)); };
+    double I = trapezoidal(g, 0.0, boost::math::constants::two_pi<double>());
+    std::cout << "I = " << I << std::endl;
 
 }
