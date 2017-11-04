@@ -5,11 +5,15 @@
 #include <boost/math/interpolators/barycentric_rational.hpp>
 #include <boost/math/special_functions/chebyshev_transform.hpp>
 #include <boost/math/quadrature/trapezoidal.hpp>
+#include <boost/math/quadrature/tanh_sinh.hpp>
 
 using boost::math::cubic_b_spline;
 using boost::math::barycentric_rational;
 using boost::math::chebyshev_transform;
 using boost::math::quadrature::trapezoidal;
+using boost::math::quadrature::tanh_sinh;
+using boost::math::constants::two_pi;
+using boost::math::constants::half_pi;
 
 int main()
 {
@@ -45,7 +49,11 @@ int main()
 
 
     auto g = [](double x) { return 1/(5 - 4*cos(x)); };
-    double I = trapezoidal(g, 0.0, boost::math::constants::two_pi<double>());
+    double I = trapezoidal(g, 0.0, two_pi<double>());
     std::cout << "I = " << I << std::endl;
 
+    tanh_sinh<double> integrator;
+    auto f2 = [&](double x)->double { return 1/(1 + pow(tan(x), 3)); };
+    double Q = integrator.integrate(f2, (double) 0, half_pi<double>());
+    std::cout << "Q = " << Q << std::endl;
 }

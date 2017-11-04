@@ -547,6 +547,17 @@ For analytic $$f$$, this scheme is *exponentially convergent*.
 
 ---
 
+## Tanh-sinh in boost.math
+
+```cpp
+#include <boost/math/quadrature/tanh_sinh.hpp>
+tanh_sinh<double> integrator;
+auto f = [](double x)->double { return 1/(1 + pow(tan(x), 3)); };
+double Q = integrator.integrate(f, (double) 0, half_pi<double>());
+```
+
+---
+
 ## Send us pull requests! We need
 
 - Wavelet transforms
