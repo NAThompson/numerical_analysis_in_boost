@@ -283,12 +283,12 @@ $$
 
 ```cpp
 #include <boost/math/interpolators/barycentric_rational.hpp>
-
+using boost::math::barycentric_rational;
 std::vector<double> x(n);
 std::vector<double> y(n);
 // initialize x, y . . .
 int approximation_order = 3;
-boost::math::barycentric_rational<double> b(x.begin(), x.end(), y.begin(), approximation_order);
+barycentric_rational<double> b(x.begin(), x.end(), y.begin(), approximation_order);
 // Interpolate:
 double y = b(12.7);
 ```
@@ -398,6 +398,7 @@ This is a DCT-II for $$x_{k} = f(\cos((k+1/2)\pi/n))$$, and hence all coefficien
 
 #include <boost/math/special_functions/chebyshev_transform.hpp>
 
+using boost::math::chebyshev_transform;
 auto f = [](double x) { return sin(x);};
 
 chebyshev_transform<double> cheb(f, 0.0, M_PI);
@@ -551,9 +552,36 @@ For analytic $$f$$, this scheme is *exponentially convergent*.
 
 ```cpp
 #include <boost/math/quadrature/tanh_sinh.hpp>
+using boost::math::quadrature::tanh_sinh;
 tanh_sinh<double> integrator;
 auto f = [](double x)->double { return 1/(1 + pow(tan(x), 3)); };
 double Q = integrator.integrate(f, (double) 0, half_pi<double>());
+```
+
+---
+
+## Gauss-Kronrod Quadrature
+
+`tanh_sinh` is *very* aggressive about attacking singularities. Sometimes, roundoff error will cause `tanh_sinh` quadrature to evaluate your function at the singularity.
+
+We can integrate functions singular at endpoints using Gauss-Kronrod quadrature.
+
+---
+
+## Gauss-Kronrod quadrature
+
+adds evaluation points to a Gaussian quadrature in such a way that an error estimate is produced along with the value of the integral.
+
+---
+
+## Gauss-Kronrod
+
+```cpp
+#include <boost/math/quadrature/gauss_kronrod.hpp>
+using boost::math::quadrature::gauss_kronrod;
+auto f = [&](double x)->double { return 1/(1 + pow(tan(x), 3)); };
+gauss_kronrod<double, 15> gk15;
+double Q = gk15.integrate(f, 0.0, M_PI/2);
 ```
 
 ---
@@ -565,5 +593,5 @@ double Q = integrator.integrate(f, (double) 0, half_pi<double>());
 - Sparse grid quadrature
 - Monte Carlo integration (Frank-Wolfe bayesian quadrature)
 - Multivariate interpolation
-
----
+- Low dimensional quadrature
+- FFTs

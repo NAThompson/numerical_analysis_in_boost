@@ -6,12 +6,14 @@
 #include <boost/math/special_functions/chebyshev_transform.hpp>
 #include <boost/math/quadrature/trapezoidal.hpp>
 #include <boost/math/quadrature/tanh_sinh.hpp>
+#include <boost/math/quadrature/gauss_kronrod.hpp>
 
 using boost::math::cubic_b_spline;
 using boost::math::barycentric_rational;
 using boost::math::chebyshev_transform;
 using boost::math::quadrature::trapezoidal;
 using boost::math::quadrature::tanh_sinh;
+using boost::math::quadrature::gauss_kronrod;
 using boost::math::constants::two_pi;
 using boost::math::constants::half_pi;
 
@@ -56,4 +58,7 @@ int main()
     auto f2 = [&](double x)->double { return 1/(1 + pow(tan(x), 3)); };
     double Q = integrator.integrate(f2, (double) 0, half_pi<double>());
     std::cout << "Q = " << Q << std::endl;
+    gauss_kronrod<double, 15> gk15;
+    Q = gk15.integrate(f2, 0.0, half_pi<double>());
+    std::cout << "Q = " << Q << " by Gauss-Kronrod\n";
 }
