@@ -27,7 +27,7 @@ slidenumbers: true
 
 ## Boost has tools for many of these
 
-. . . but we will discuss only *new* features of Boost.Math, landing in 1.66
+. . . but we will discuss only *new* features of Boost.Math, landing in 1.66/1.67
 
 
 ---
@@ -55,6 +55,12 @@ You know what’s slow? Spending all day trying to figure out why it doesn’t w
 2) Stability
 3) Optimal asymptotic complexity
 4) Speed
+
+---
+
+## Goals of this talk:
+
+Introduce modern idea from numerical analysis, get people interested in wrapping Boost.math into pip package and webassembly.
 
 ---
 
@@ -314,6 +320,31 @@ Special cases have been proven forward stable, but no general proof is known
 
 ---
 
+## Catmull-Rom (lands in 1.67)
+
+In computer graphics, functions need to be interpolated at *every pixel*. Storing all this data is prohibitive, so we need to interpolate between stored points.
+
+![inline](figures/catmull_rom.jpg)
+
+---
+
+```cpp
+#include <boost/math/interpolators/catmull_rom.hpp>
+using boost::math::catmull_rom;
+
+std::vector<Point> v(n);
+// initialize v then pass it to interpolator:
+catmull_rom<Point> cat(v.data(), v.size());
+
+// Interpolate:
+auto p = cat(0.01);
+// Compute tangent:
+auto tangent = cat.prime(0.01);
+```
+
+
+---
+
 ## Chebyshev polynomials
 
 are defined by a three-term recurrence
@@ -560,7 +591,7 @@ double Q = integrator.integrate(f, (double) 0, half_pi<double>());
 
 ---
 
-## Gauss-Kronrod Quadrature
+## Gauss-Kronrod quadrature
 
 `tanh_sinh` is *very* aggressive about attacking singularities. Sometimes, roundoff error will cause `tanh_sinh` quadrature to evaluate your function at the singularity.
 
@@ -574,7 +605,7 @@ adds evaluation points to a Gaussian quadrature in such a way that an error esti
 
 ---
 
-## Gauss-Kronrod
+## Gauss-Kronrod quadrature
 
 ```cpp
 #include <boost/math/quadrature/gauss_kronrod.hpp>
@@ -586,12 +617,163 @@ double Q = gk15.integrate(f, 0.0, M_PI/2);
 
 ---
 
+## Monte-Carlo Integration (lands in 1.67)
+
+All previous quadrature methods are 1D! For integration in very large dimension, we use Monte-Carlo integration
+
+---
+
+## Monte-Carlo Integration
+
+```cpp
+#include <boost/math/quadrature/naive_monte_carlo.hpp>
+// Define a function to integrate. Calls must be threadsafe
+auto g = [](std::vector<double> const & x)
+{
+  return 1.0 / (1.0 - cos(x[0])*cos(x[1])*cos(x[2]));
+};
+// Bounds can be finite or infinite:
+std::vector<std::pair<double, double>> bounds{{0, M_PI}, {0, M_PI}, {0, M_PI}};
+double error_goal = 0.001
+naive_monte_carlo<double, decltype(g)> mc(g, bounds, error_goal);
+
+std::future<double> task = mc.integrate();
+while (task.wait_for(std::chrono::seconds(1)) != std::future_status::ready) {
+    display_progress(mc.progress());
+    if (some_signal_heard()) {
+        mc.cancel();
+    }
+}
+double I = task.get();
+```
+
+---
+
+## Monte-Carlo integration
+
+Naive Monte-Carlo integration is very robust.
+
+But for $$n$$ function evaluations, we only get error of order $$\sigma/\sqrt{n}$$.
+
+Recovering one more digit takes 100x the time!
+
+
+---
+
+## Quasi-Monte Carlo integration (lands in 1.67)
+
+uses a "sub"-random sequence for quadrature nodes to improve the convergence rate over quasi-Monte Carlo integration
+
+---
+
+## Random vs Quasi-random sequences
+
+![inline](figures/random_sequence.png)![inline](figures/quasi_random_sequence.png)
+
+---
+
+## Quasi Random sequences (lands in 1.67)
+
+```cpp
+#include <boost/math/tools/halton_sequence.hpp>
+#include <boost/math/tools/atanassov_sequence.hpp>
+#include <boost/math/tools/cranley_patterson_rotation.hpp>
+
+size_t dimension = 580;
+std::vector<double> x(dimension);
+atanassov_sequence<double> atanassov(dimension);
+halton_sequence<double> halton(dimension);
+cranley_patterson_rotation<double> cranley(dimension);
+// Fill up x with quasi-random numbers from the Atanassov sequence:
+atanassov(x.begin(), x.end());
+// Fill up x with quasi-random numbers from the leaped Halton sequence:
+halton(x.begin(), x.end());
+// Optionally, randomize the quasi-random sequence with a Cranley-Patterson rotation:
+cranley(x.begin(), x.end());
+```
+
+Calls to all these functions are threadsafe.
+
+---
+
+## Randomized quasi-Monte Carlo integration
+
+Quadrature nodes taken from a randomized quasi-random sequence. Convergence rate improves over traditional Monte-Carlo integration to $$\mathcal{O}\left(\frac{\log(n)^{d}}{\sqrt{t}n}\right)$$, where $$t$$ is the number of threads, $$d$$ is the dimension, and $$n$$ is the number of function evaluations each thread is able to perform.
+
+---
+
+##  Randomized quasi-Monte Carlo integration
+
+```cpp
+#include <boost/math/quadrature/randomized_quasi_monte_carlo.hpp>
+auto g = [](std::vector<double> const & x) {
+  return 1/(1-cos[0]*cos[1]);
+};
+
+std::vector<std::pair<double, double>> bounds{{0, 1}, {0, 1}};
+double error_goal = 0.0001;
+randomized_quasi_monte_carlo<double, decltype(g)> mc(g, bounds, error_goal);
+
+auto task = mc.integrate();
+// Update error goal, view current error estimate, or cancel here.
+double value = task.get();
+```
+
+---
+
+## Integer factorization by trial division
+
+```cpp
+#include <boost/math/tools/factor_integer.hpp>
+auto factors = boost::math::trial_division(2*2*2*2*3*3*3*3*3);
+// Prime divisor in '.first':
+int two = factors[0].first;
+// Multiplicity of divisor in '.second':
+int four = factors[0].second;
+int three = factors[1].first;
+```
+
+
+---
+
+## Integer factorization by Pollard rho:
+
+```cpp
+#include <boost/math/tools/factor_integer.hpp>
+auto i = static_cast<uint128_t>(99432527)*static_cast<uint128_t>(1177212722617);
+auto factor1 = pollard_rho(i);
+// Need to check if the algorithm succeeded
+if (factor1) {
+  factor2 = i/factor1.value();
+} else {
+    std::cout << "Pollard rho failed!\n";
+}
+```
+
+Pollard $$\rho$$ sucks up all the threads on your machine!
+
+Expect your laptop battery to die.
+
+---
+
+## (Dream) Crown jewel of release 1.67: RiskShrink signal denoising and wavelet compression!
+
+Still in gestation, but should be able to denoise horrible signals reliably without user input.
+
+Should be able to (lossy) compress non-random signals of length $$N$$ to length (optimally ) $$\sqrt{N}$$ and $$~N/100$$ in general.
+
+Should be able to turn dense matrices into sparse matrices with little loss of fidelity.
+
+---
+
 ## Send us pull requests! We need
 
 - Wavelet transforms
 - RiskShrink denoising
 - Sparse grid quadrature
-- Monte Carlo integration (Frank-Wolfe bayesian quadrature)
+- Frank-Wolfe bayesian quadrature
 - Multivariate interpolation
 - Low dimensional quadrature
 - FFTs
+- continuous Fourier transform
+- Markov chains
