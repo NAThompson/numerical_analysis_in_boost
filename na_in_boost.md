@@ -345,6 +345,12 @@ auto tangent = cat.prime(0.01);
 
 ---
 
+## Catmull-Rom complexity
+
+$$\mathcal{O}(N)$$ constructor and $$\mathcal{O}(\log(N))$$ evaluation.
+
+---
+
 ## Chebyshev polynomials
 
 are defined by a three-term recurrence
@@ -473,6 +479,15 @@ $$
 $$
 
 so numerical quadrature much be used.
+
+---
+
+## Quadrature use cases:
+
+- Finite elements (weak formulation of PDEs)
+- Quantum mechanics (integrals over Brillouin zones, [dynamic structure factors](https://en.wikipedia.org/wiki/Dynamic_structure_factor))
+- Pricing financial assets
+- Machine learning
 
 ---
 
@@ -672,7 +687,7 @@ uses a "sub"-random sequence for quadrature nodes to improve the convergence rat
 
 ---
 
-## Quasi Random sequences (lands in 1.67)
+## Quasi-random sequences (lands in 1.67)
 
 ```cpp
 #include <boost/math/tools/halton_sequence.hpp>
@@ -696,7 +711,7 @@ Calls to all these functions are threadsafe.
 
 ---
 
-## Randomized quasi-Monte Carlo integration
+## Randomized quasi-Monte Carlo integration (1.67)
 
 Quadrature nodes taken from a randomized quasi-random sequence. Convergence rate improves over traditional Monte-Carlo integration to $$\mathcal{O}\left(\frac{\log(n)^{d}}{\sqrt{t}n}\right)$$, where $$t$$ is the number of threads, $$d$$ is the dimension, and $$n$$ is the number of function evaluations each thread is able to perform.
 
@@ -721,7 +736,7 @@ double value = task.get();
 
 ---
 
-## Integer factorization by trial division
+## Integer factorization by trial division (1.67)
 
 ```cpp
 #include <boost/math/tools/factor_integer.hpp>
@@ -733,15 +748,26 @@ int four = factors[0].second;
 int three = factors[1].first;
 ```
 
+---
+
+## Trial division is worst-case exponential complexity
+
+But who cares? Half of all integers are divisible by 2, a third are divisible by three, and 92% of all integers have a factor under 1000.
+
+So trial division successfully splits most randomly chosen integers quickly.
+
+Boost checks the first 10,000 primes, which should split most input successfully.
+
+For more difficult inputs, use Pollard $$\rho$$
 
 ---
 
-## Integer factorization by Pollard rho:
+## Integer factorization by Pollard $$\rho$$ (1.67)
 
 ```cpp
 #include <boost/math/tools/factor_integer.hpp>
-auto i = static_cast<uint128_t>(99432527)*static_cast<uint128_t>(1177212722617);
-auto factor1 = pollard_rho(i);
+auto N = static_cast<uint128_t>(99432527)*static_cast<uint128_t>(1177212722617);
+auto factor1 = pollard_rho(N);
 // Need to check if the algorithm succeeded
 if (factor1) {
   factor2 = i/factor1.value();
@@ -753,6 +779,14 @@ if (factor1) {
 Pollard $$\rho$$ sucks up all the threads on your machine!
 
 Expect your laptop battery to die.
+
+---
+
+## Pollard $$\rho$$ complexity
+
+If $$N = p_1 p_2$$ with $$p_1 \le p_2$$, then the runtime is $$\mathcal{O}(\sqrt{p_1}) = \mathcal{O}(N^{1/4})$$.
+
+Speedups from using multiple threads occur because there is large variance in runtime based on the seed (see "An Improved Monte Carlo Factoring Algorithm" by Richard Brent for details).
 
 ---
 
@@ -773,7 +807,8 @@ Should be able to turn dense matrices into sparse matrices with little loss of f
 - Sparse grid quadrature
 - Frank-Wolfe bayesian quadrature
 - Multivariate interpolation
-- Low dimensional quadrature
+- Low dimensional quadrature for finite element geometries
 - FFTs
-- continuous Fourier transform
+- continuous Fourier transform, oscillatory quadrature
+- Cauchy principle value integrals
 - Markov chains
