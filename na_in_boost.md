@@ -2,15 +2,9 @@ autoscale: true
 slidenumbers: true
 
 
-## Numerical Analysis in Boost.Math
+## Numerical Methods in Boost.Math
 
- Nick Thompson
-
----
-
-> Numerical analysis is the study of algorithms for solving the problems of continuous mathematics
-
--- [Lloyd N. Trefethen](http://people.maths.ox.ac.uk/trefethen/NAessay.pdf)
+ Nick Thompson, bandgap.io
 
 ---
 
@@ -27,7 +21,7 @@ slidenumbers: true
 
 ## Boost has tools for many of these
 
-. . . but we will discuss only *new* features of Boost.Math, landing in 1.66/1.67
+. . . but we will discuss only *new* features of Boost.Math, landing in 1.66-1.70
 
 
 ---
@@ -42,8 +36,7 @@ The features I added would have been stillborn without John's help.
 
 ---
 
-> It’s always been 'We can’t do it that way. It would be too slow.'
-You know what’s slow? Spending all day trying to figure out why it doesn’t work. That’s slow. That’s the slowest thing I know.
+> It’s always been 'We can’t do it that way. It would be too slow.' You know what’s slow? Spending all day trying to figure out why it doesn’t work. That’s slow. That’s the slowest thing I know.
 
 -- [Paul Phillips](https://www.youtube.com/watch?v=TS1lpKBMkgg)
 
@@ -80,62 +73,6 @@ Every numerical algorithm an undergrad can understand breaks in production
 - Jacobi iteration *too slow*
 - Euler's method for ODEs *too slow*
 - Newton-Cotes quadrature *too slow*
-
----
-
-## Reliability Model
-
-HPC calcs: 100 nodes, 64 threads/node, 2 week compute => $${\sim}10^{10}$$ seconds of compute
-
-Assuming each function call (at the top of the callstack) takes $$1\mu\mathrm{s}$$, then there are $${\sim}10^{16}$$ function calls in the average HPC task
-
----
-
-## Reliability Model
-
-If any of these $$n \approx 10^{16}$$ calls segfaults, leaks/uses too much memory, or *leaks an abstraction*, the whole job dies, or the result is worthless.
-
-Let $$p$$ denote the probability of failure for each function call.
-Assuming independence
-
-$$
-P(\mathrm{Job\, succeeds}) = \binom{n}{0}(p)^{n-n}(1-p)^{n} = (1-p)^{n}
-$$
-
----
-
-## Reliability Model
-
-On gcloud, this example computation costs $${\sim}$75,000$$.
-What is your tolerance for job failure?
-
-Assume 1% can fail. Then we must have
-
-$$
-p_{\mathrm{fail}} \le 1 - \exp(\log(.99)/10^{16}) \approx 10^{-18}
-$$
-
----
-
-## Reliability Model
-
-HPC codes cannot *segfault*, *leak memory*, or *break abstractions*, except with vanishing probability.
-
-If the algorithms in boost.math weren't advanced, *they'd be useless*.
-
----
-
-
-## Interpolation
-
-Given a function known at points, you want to know its value at points between the known points.
-
-Examples:
-
-- Create a graph from a list of data points.
-- Find values between points of a numerical solution to an ODE
-- "Create" data between sensors
-
 
 ---
 
@@ -261,6 +198,7 @@ $$
 r(x) = \frac{\sum_{k=0}^{n} \frac{ w_{k} }{x-x_k} f(x_{k})}{\sum_{k=0}^{n} \frac{w_{k}}{x-x_k}}
 $$
 
+which manifestly has no poles.
 
 ---
 
@@ -297,6 +235,8 @@ int approximation_order = 3;
 barycentric_rational<double> b(x.begin(), x.end(), y.begin(), approximation_order);
 // Interpolate:
 double y = b(12.7);
+// Interpolate derivative:
+double yp = b.prime(12.7);
 ```
 
 ---
@@ -304,6 +244,8 @@ double y = b(12.7);
 ## [barycentric\_rational](http://www.boost.org/doc/libs/1_65_1/libs/math/doc/html/math_toolkit/interpolate/barycentric.html) complexity
 
 $$\mathcal{O}(n)$$ constructor and $$\mathcal{O}(n)$$ evaluation.
+
+Not fast enough! If anyone knows of an irregular interpolator that can be evaluated in $$\mathcal{O}(1)$$ or $$\mathcal{O}(\log(n))$$ time, let me know!
 
 ---
 
@@ -320,7 +262,7 @@ Special cases have been proven forward stable, but no general proof is known
 
 ---
 
-## Catmull-Rom (lands in 1.67)
+## Catmull-Rom (lands in 1.70)
 
 In computer graphics, functions need to be interpolated at *every pixel*. Storing all this data is prohibitive, so we need to interpolate between stored points.
 
@@ -332,16 +274,16 @@ In computer graphics, functions need to be interpolated at *every pixel*. Storin
 #include <boost/math/interpolators/catmull_rom.hpp>
 using boost::math::catmull_rom;
 
+// Points must support indexing [] and a few other conceptual requirements
 std::vector<Point> v(n);
 // initialize v then pass it to interpolator:
-catmull_rom<Point> cat(v.data(), v.size());
+catmull_rom<Point> cat(std::move(v));
 
 // Interpolate:
 auto p = cat(0.01);
 // Compute tangent:
 auto tangent = cat.prime(0.01);
 ```
-
 
 ---
 
@@ -460,37 +402,6 @@ Pull requests to eliminate this dependency are welcome!
 
 ---
 
-## Quadrature
-
-is the numerical art of evaluating integrals
-
-$$
-I_{a}^{b}[f] := \int_{a}^{b} f(x) \, \mathrm{d}x \in \mathbb{R}
-$$
-
----
-
-## Quadrature
-
-Most integrals do not have "analytic representations", such as
-
-$$
-\int_{-\infty}^{\infty} e^{-x^2} \, \mathrm{d}x = \sqrt{\pi}
-$$
-
-so numerical quadrature much be used.
-
----
-
-## Quadrature use cases:
-
-- Finite elements (weak formulation of PDEs)
-- Quantum mechanics (integrals over Brillouin zones, [dynamic structure factors](https://en.wikipedia.org/wiki/Dynamic_structure_factor))
-- Pricing financial assets
-- Machine learning
-
----
-
 ## Trapezoidal Rule
 
 ![inline](figures/trapezoidal.png)
@@ -559,6 +470,14 @@ double I = trapezoidal(f, 0.0, 2*M_PI);
 ```
 
 ---
+
+## Contour integrals
+
+Contour integrals and high-order numerical derivatives can be computed with trapezoidal quadrature, but the contour must be chosen by the user.
+
+
+---
+
 
 ## Periodic integrands
 
@@ -632,13 +551,24 @@ double Q = gk15.integrate(f, 0.0, M_PI/2);
 
 ---
 
-## Monte-Carlo Integration (lands in 1.67)
+## Gauss-Kronrod quadrature
 
-All previous quadrature methods are 1D! For integration in very large dimension, we use Monte-Carlo integration
+For collocation/Nystrom methods, we can extract the nodes and weights via:
+
+```cpp
+gauss_kronrod<double, 15> gk15;
+auto& w = gk15.weights();
+auto& a = gk15.abscissas();
+```
+
 
 ---
 
 ## Monte-Carlo Integration
+
+All previous quadrature methods are 1D! For integration in very large dimension, we use Monte-Carlo integration
+
+---
 
 ```cpp
 #include <boost/math/quadrature/naive_monte_carlo.hpp>
@@ -649,7 +579,7 @@ auto g = [](std::vector<double> const & x)
 };
 // Bounds can be finite or infinite:
 std::vector<std::pair<double, double>> bounds{{0, M_PI}, {0, M_PI}, {0, M_PI}};
-double error_goal = 0.001
+double error_goal = 0.001;
 naive_monte_carlo<double, decltype(g)> mc(g, bounds, error_goal);
 
 std::future<double> task = mc.integrate();
@@ -675,7 +605,7 @@ Recovering one more digit takes 100x the time!
 
 ---
 
-## Quasi-Monte Carlo integration (lands in 1.67)
+## Quasi-Monte Carlo integration (lands in 1.71)
 
 uses a "sub"-random sequence for quadrature nodes to improve the convergence rate over quasi-Monte Carlo integration
 
@@ -687,31 +617,20 @@ uses a "sub"-random sequence for quadrature nodes to improve the convergence rat
 
 ---
 
-## Quasi-random sequences (lands in 1.67)
+## Quasi-random sequences
 
 ```cpp
-#include <boost/math/tools/halton_sequence.hpp>
-#include <boost/math/tools/atanassov_sequence.hpp>
-#include <boost/math/tools/cranley_patterson_rotation.hpp>
+#include <boost/random/faure.hpp>
+#include <boost/random/sobol.hpp>
+#include <boost/random/niederreiter_base2.hpp>
 
-size_t dimension = 580;
-std::vector<double> x(dimension);
-atanassov_sequence<double> atanassov(dimension);
-halton_sequence<double> halton(dimension);
-cranley_patterson_rotation<double> cranley(dimension);
-// Fill up x with quasi-random numbers from the Atanassov sequence:
-atanassov(x.begin(), x.end());
-// Fill up x with quasi-random numbers from the leaped Halton sequence:
-halton(x.begin(), x.end());
-// Optionally, randomize the quasi-random sequence with a Cranley-Patterson rotation:
-cranley(x.begin(), x.end());
+boost::random::niederreiter_base2 gen(2000);
 ```
 
-Calls to all these functions are threadsafe.
 
 ---
 
-## Randomized quasi-Monte Carlo integration (1.67)
+## Randomized quasi-Monte Carlo integration (1.70)
 
 Quadrature nodes taken from a randomized quasi-random sequence. Convergence rate improves over traditional Monte-Carlo integration to $$\mathcal{O}\left(\frac{\log(n)^{d}}{\sqrt{t}n}\right)$$, where $$t$$ is the number of threads, $$d$$ is the dimension, and $$n$$ is the number of function evaluations each thread is able to perform.
 
@@ -719,78 +638,155 @@ Quadrature nodes taken from a randomized quasi-random sequence. Convergence rate
 
 ##  Randomized quasi-Monte Carlo integration
 
+These slides are an attempt to shame myself into finishing the [PR](https://github.com/boostorg/math/pull/98)
+
+---
+
+## Numerical differentiation
+
+via the complex step derivative:
+
+$$
+f'(x) \approx \Im f(x+ih)/h + \mathcal{O}(h^2)
+$$
+
 ```cpp
-#include <boost/math/quadrature/randomized_quasi_monte_carlo.hpp>
-auto g = [](std::vector<double> const & x) {
-  return 1/(1-cos[0]*cos[1]);
-};
+#include <boost/math/tools/numerical_differentiation.hpp>
 
-std::vector<std::pair<double, double>> bounds{{0, 1}, {0, 1}};
-double error_goal = 0.0001;
-randomized_quasi_monte_carlo<double, decltype(g)> mc(g, bounds, error_goal);
-
-auto task = mc.integrate();
-// Update error goal, view current error estimate, or cancel here.
-double value = task.get();
+double x = 7.2;
+double e_prime = complex_step_derivative(std::exp<std::complex<double>>, x);
 ```
 
 ---
 
-## Integer factorization by trial division (1.67)
+## Numerical differentiation
+
+via finite differences
 
 ```cpp
-#include <boost/math/tools/factor_integer.hpp>
-auto factors = boost::math::trial_division(2*2*2*2*3*3*3*3*3);
-// Prime divisor in '.first':
-int two = factors[0].first;
-// Multiplicity of divisor in '.second':
-int four = factors[0].second;
-int three = factors[1].first;
+auto f = [](double x) { return std::exp(x); };
+double x = 1.7;
+double dfdx = finite_difference_derivative(f, x);
+```
+
+Note: No stepsize needed! Error is roughly $${\sim}\epsilon^{6/7}$$.
+
+---
+
+## Lanczos denoising derivatives (1.70)
+
+![inline 150%](figures/ligo_derivative.svg)
+
+---
+
+## Lanczos denoising derivatives
+
+```cpp
+#include <boost/math/differentiation/lanczos_smoothing.hpp>
+std::vector<double> v(500);
+ // fill v with noisy data.
+ double spacing = 0.001;
+ using boost::math::differentiation::discrete_lanczos_derivative;
+ auto lanczos = discrete_lanczos_derivative(spacing);
+ // Compute dvdt at index 30:
+ double dvdt30 = lanczos(v, 30);
+ // Compute derivative of entire vector:
+ std::vector<double> dvdt = lanczos(v);
 ```
 
 ---
 
-## Trial division is worst-case exponential complexity
-
-But who cares? Half of all integers are divisible by 2, a third are divisible by three, and 92% of all integers have a factor under 1000.
-
-So trial division successfully splits most randomly chosen integers quickly.
-
-Boost checks the first 10,000 primes, which should split most input successfully.
-
-For more difficult inputs, use Pollard $$\rho$$
-
----
-
-## Integer factorization by Pollard $$\rho$$ (1.67)
+# Single-pass statistics
 
 ```cpp
-#include <boost/math/tools/factor_integer.hpp>
-auto N = static_cast<uint128_t>(99432527)*static_cast<uint128_t>(1177212722617);
-auto factor1 = pollard_rho(N);
-// Need to check if the algorithm succeeded
-if (factor1) {
-  factor2 = i/factor1.value();
-} else {
-    std::cout << "Pollard rho failed!\n";
-}
+#include <boost/math/tools/univariate_statistics.hpp>
+#include <boost/math/tools/bivariate_statistics.hpp> // for covariance and correlation coeff
+
+std::vector<double> u{/* fill up with your data */};
+double mu = boost::math::tools::mean(u);
 ```
 
-Pollard $$\rho$$ sucks up all the threads on your machine!
-
-Expect your laptop battery to die.
+We will provide the mean, median, variance, skewness, kurtosis, covariance, and correlation coefficient.
 
 ---
 
-## Pollard $$\rho$$ complexity
+## Single-pass statistics
 
-If $$N = p_1 p_2$$ with $$p_1 \le p_2$$, then the runtime is $$\mathcal{O}(\sqrt{p_1}) = \mathcal{O}(N^{1/4})$$.
-
-Speedups from using multiple threads occur because there is large variance in runtime based on the seed (see "An Improved Monte Carlo Factoring Algorithm" by Richard Brent for details).
+Think this is trivial? Numerically stable, single pass algorithms to compute these quantities weren't invented until 2009!
 
 ---
 
-## (Dream) Crown jewel of release 1.67: RiskShrink signal denoising and wavelet compression!
+## Norms
+
+Well, nothing special here:
+
+```cpp
+#include <boost/math/tools/norms.hpp>
+
+double l0 = boost::math::tools::l0_pseudo_norm(v);
+double l2 = boost::math::tools::l2_norm(v);
+double tv = boost::math::tools::total_variation(v);
+```
+
+---
+
+## Solve quadratic equations:
+
+Never solve a quadratic equation without a library call.
+Doing it right requires forcing the use of a fused-multiply-add.
+
+```cpp
+#include <boost/math/tools/roots.hpp>
+auto [x0, x1] = boost::math::tools::quadratic_roots(a, b, c);
+```
+
+
+---
+
+## Complex root extraction:
+
+```cpp
+#include <boost/math/tools/roots.hpp>
+
+std::complex<double> guess = {0,1};
+// f must return a std::pair<Complex, Complex>:
+std::complex<double> r = boost::math::tools::complex_newton(f, guess);
+```
+
+---
+
+## Measuring sparsity
+
+How do we tell if a vector is sparse, especially in the presence of noise?
+
+---
+
+## Measuring sparsity
+
+```cpp
+#include <boost/math/tools/signal_statistics.hpp>
+
+double gini = sample_absolute_gini_coefficient(v);
+
+double hs = hoyer_sparsity(v);
+```
+
+---
+
+## Blind SNR estimation
+
+We can estimate the SNR of a data-bearing signal via the $$M_{2}M_{4}$$ estimator.
+
+```cpp
+#include <boost/math/tools/signal_statistics.hpp>
+double signal_kurtosis = 1.5; // sinusoidal kurtosis
+double noise_kurtosis = 3; // Gaussian noise
+double snr = m2m4_snr_estimator(v, signal_kurtosis, noise_kurtosis);
+```
+
+---
+
+## (Dream) Crown jewel of release 1.70: RiskShrink signal denoising and wavelet compression!
 
 Still in gestation, but should be able to denoise horrible signals reliably without user input.
 
@@ -800,15 +796,22 @@ Should be able to turn dense matrices into sparse matrices with little loss of f
 
 ---
 
-## Send us pull requests! We need
+## Other features:
 
-- Wavelet transforms
-- RiskShrink denoising
-- Sparse grid quadrature
-- Frank-Wolfe bayesian quadrature
-- Multivariate interpolation
-- Low dimensional quadrature for finite element geometries
-- FFTs
-- continuous Fourier transform, oscillatory quadrature
-- Cauchy principle value integrals
-- Markov chains
+- John Maddock is working on the hypergeometric function; it will probably cross the finish line soon.
+- [Mike Pulver](https://github.com/pulver/autodiff) is adding an automatic differentiation routine
+
+---
+
+## Roadmap
+
+- Filters: Maxflat derivative, notch, Butterworth, Wiener, Kalman
+- Getting into 2 and 3 dimensions: bicubic b-spline interpolation, kriging,
+- Hamiltonian Monte-Carlo integration
+- Continuous wavelet evaluation (partially a research project)
+
+---
+
+[github.com/boostorg/math](https://github.com/boostorg/math)
+
+[github.com/NAThompson/numerical_analysis_in_boost](https://github.com/NAThompson/numerical_analysis_in_boost)
